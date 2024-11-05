@@ -13,11 +13,28 @@ IMG_FILE="archlinuxarm-rpi.img"
 function section() {
   local len=${#1}
   local line=$(printf "%0.s-" $(seq 1 $len))
+  
+  if [ $# -eq 1 ]; then # hack so the first header doesn't have an extra newline
+    echo
+  fi
 
-  echo
   echo "$line"
   echo "$1"
   echo "$line"
+}
+
+function check() {
+  if [ $? -ne 0 ]; then
+    echo "Command failed. Aborting..."
+    exit $?
+  fi
+}
+
+function run() {
+  echo
+  echo "executing: $@"
+  eval "$@"
+  check
 }
 
 if [ "$EUID" -ne 0 ]; then
@@ -25,42 +42,43 @@ if [ "$EUID" -ne 0 ]; then
   exit
 fi
 
-section "Downloading image tarball"
+section "Downloading image tarball" "this is the hack mentioned above"
 if [ ! -f "$IMAGE_TARBALL_NAME" ]; then
-  wget "$IMAGE_TARBALL_URL"
-  chmod 644 "$IMAGE_TARBALL_NAME"
+  run wget "$IMAGE_TARBALL_URL"
+  run chmod 644 "$IMAGE_TARBALL_NAME"
 else
   echo "Image tarball already downloaded"
 fi
 
 section "Creating directories"
-mkdir -p boot root
+run mkdir -p boot root
 
 section "Extracting image"
-bsdtar -xpf "$IMAGE_TARBALL_NAME" -C root
-sync
+run bsdtar -xpf "$IMAGE_TARBALL_NAME" -C root
+run sync
 
 size=$(du -sb root | awk '{print $1}')
 buffer_size=$((size * 110 / 100))  # 10% buffer
 img_size_mb=$((buffer_size / 1024 / 1024))
 
 section "Copying boot files"
-mkdir -p boot root
-mv root/boot/* boot
+run mv root/boot/* boot
 
 section "Fixing fstab"
-sed -i 's/mmcblk0/mmcblk1/g' root/etc/fstab
+run sed -i 's/mmcblk0/mmcblk1/g' root/etc/fstab
 
 section "Creating .img file"
 if [ -f "$IMG_FILE" ]; then
-  rm -f "$IMG_FILE"
+  run rm -f "$IMG_FILE"
 fi
 
-dd if=/dev/zero of="$IMG_FILE" bs=1M count="$img_size_mb" status=progress
-chmod 644 "$IMG_FILE"
+run dd if=/dev/zero of="$IMG_FILE" bs=1M count="$img_size_mb" status=progress
+run chmod 644 "$IMG_FILE"
 
 section "Attaching loop device"
+echo "losetup -fP --show $IMG_FILE"
 LOOP_DEVICE=$(losetup -fP --show "$IMG_FILE")
+check
 
 if [ -z "$LOOP_DEVICE" ]; then
     echo "Failed to set up loop device."
@@ -91,19 +109,19 @@ section "Creating partitions"
 } | fdisk "$LOOP_DEVICE"
 
 section "Formatting partitions"
-mkfs.vfat "${LOOP_DEVICE}p1"
-mkfs.ext4 "${LOOP_DEVICE}p2"
+run mkfs.vfat "${LOOP_DEVICE}p1"
+run mkfs.ext4 "${LOOP_DEVICE}p2"
 
-section "Mounting partitions"
-mount "${LOOP_DEVICE}p1" boot
-mount "${LOOP_DEVICE}p2" root
+section "Checking if partitions can mount"
+run mount "${LOOP_DEVICE}p1" boot
+run mount "${LOOP_DEVICE}p2" root
 
 section "Cleaning up"
-umount boot root
-rm -rf boot root
-losetup -d "$LOOP_DEVICE"
+run umount boot root
+run rm -rf boot root
+run losetup -d "$LOOP_DEVICE"
 cd - > /dev/null
-mv $scriptloc/work/$IMG_FILE .
+run mv $scriptloc/work/$IMG_FILE .
 
 section "Done setting up image"
 
