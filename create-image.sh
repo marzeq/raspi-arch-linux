@@ -1,5 +1,10 @@
 #!/bin/env bash
 
+filename="$(basename $0)"
+if [ "$EUID" -ne 0 ]; then
+  exec sudo bash "$filename"
+fi
+
 scriptloc="$(dirname $0)"
 cd $scriptloc
 mkdir -p work
@@ -37,10 +42,7 @@ function run() {
   check
 }
 
-if [ "$EUID" -ne 0 ]; then
-  echo "Please run as root"
-  exit
-fi
+
 
 section "Downloading image tarball" "this is the hack mentioned above"
 if [ ! -f "$IMAGE_TARBALL_NAME" ]; then

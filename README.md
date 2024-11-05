@@ -9,7 +9,7 @@ This is a repository containing a collection of scripts and guides to create a b
 To create a bootable Arch Linux image for the Raspberry Pi, run the following command:
 
 ```bash
-sudo ./create-image.sh
+./create-image.sh # if you are not root, you will be prompted for your password
 ```
 
 This will create a bootable Arch Linux image called `archlinuxarm-rpi.img` in your current working directory.
