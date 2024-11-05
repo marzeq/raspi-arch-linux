@@ -191,6 +191,10 @@ sudo nano /etc/locale.conf
 LANG=(your locale) # e.g. en_GB.UTF-8
 ```
 
+#### I/O and Ras-Pi specific hardware
+
+See the Arch Linux Arm wiki [here](https://archlinuxarm.org/wiki/Raspberry_Pi).
+
 ## Supported/tested devices
 
 - Raspberry Pi 4 Model B
