@@ -16,6 +16,8 @@ This will create a bootable Arch Linux image called `archlinuxarm-rpi.img` in yo
 
 ### Flash the image to an SD card
 
+#### Using `dd`
+
 Plug in your SD card reader and identify its device name. You can use the `lsblk` command to list all block devices:
 
 ```bash
@@ -30,11 +32,19 @@ To flash the image to the SD card, run the following command:
 sudo dd if=archlinuxarm-rpi.img of=/dev/sdX bs=4M status=progress
 ```
 
-Technically, you should be able to boot your Raspberry Pi with the SD card at this point. However, the root partition will not be resized to fill the entire SD card and you will not be able to perform a system upgrade. To fix this, follow the next section.
+#### Using Raspberry Pi Imager
+
+Alternatively, you can use the Raspberry Pi Imager to flash the image to the SD card. Simply select the "Use custom" option and choose the `archlinuxarm-rpi.img` file.
+
+### Boot the Raspberry Pi as a test
+
+Technically, you should be able to boot your Raspberry Pi with the SD card at this point. Boot into the system and check if you can get into the login prompt and/or SSH into the system (default username is `alarm` and password is `alarm`).
+
+However, there is one issue: the root partition will not be resized to fill the entire SD card and you will not be able to perform a system upgrade. To fix this, follow the next section.
 
 ### Resize the root partition
 
-To resize the root partition to fill the entire SD card using a software like `parted`:
+To resize the root partition to fill the entire SD card using a software like `parted`, follow these steps on a different Linux machine from the Raspberry Pi:
 
 ```bash
 sudo parted /dev/sdX
@@ -57,7 +67,7 @@ sudo resize2fs /dev/sdX2
 
 Insert the SD card into the Raspberry Pi, plug it into ethernet (you may use wired tethering from your phone as an alternative) and power it on.
 
-SSH should be enabled by default. Connect to it using SSH and the default username `alarm` and password `alarm`.
+SSH should be enabled by default. You can connect to the R-Pi using the default username `alarm` and password `alarm`, as detailed previously.
 
 Then, change into the `root` user using the following command:
 
