@@ -14,6 +14,11 @@ To create a bootable Arch Linux image for the Raspberry Pi, run the following co
 
 This will create a bootable Arch Linux image called `archlinuxarm-rpi.img` in your current working directory.
 
+You can provide the `safe-buffer-space=<size-percentage>` argument to the script. It's the amount of space to leave at the end of the image for the root partition (default: 50% of the image size).
+
+From my testing, anything below 50% will not be big enough for the unpacked data to fit in the image due to difference in the calculated unpacked size and the actual unpacked size.
+The default value should be just enough to create the smallest possible .img file. If you wish to skip the step of resizing the root partition later on, you can increase this value if you are fine with creating a much larger file.
+
 ### Flash the image to an SD card
 
 #### Using `dd`
@@ -44,16 +49,10 @@ However, there is one issue: the root partition will not be resized to fill the 
 
 ### Resize the root partition
 
-To resize the root partition to fill the entire SD card using a software like `parted`, follow these steps on a different Linux machine from the Raspberry Pi:
+To resize the root partition to fill the entire SD card, run the included script:
 
 ```bash
-sudo parted /dev/sdX
-
-  # inside parted:
-  print
-  # identify the root partition number (e.g. 2)
-  resizepart 2 100%
-  quit
+./resize-image-on-drive.sh /dev/sdX (partition number - probably 2) # if you are not root, you will be prompted for your password
 ```
 
 Finally, resize the filesystem to fill the entire root partition:

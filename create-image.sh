@@ -2,7 +2,7 @@
 
 filename="$(basename $0)"
 if [ "$EUID" -ne 0 ]; then
-  exec sudo bash "$filename"
+  exec sudo bash "$filename" $@
 fi
 
 scriptloc="$(dirname $0)"
@@ -28,9 +28,18 @@ function section() {
   echo "$line"
 }
 
+function cleanup() {
+  echo "Cleaning up..."
+  run umount boot root
+  run rm -rf boot root
+  run losetup -d "$LOOP_DEVICE"
+  cd - > /dev/null
+}
+
 function check() {
   if [ $? -ne 0 ]; then
     echo "Command failed. Aborting..."
+    cleanup
     exit $?
   fi
 }
@@ -42,8 +51,6 @@ function run() {
   check
 }
 
-
-
 section "Downloading image tarball" "this is the hack mentioned above"
 if [ ! -f "$IMAGE_TARBALL_NAME" ]; then
   run wget "$IMAGE_TARBALL_URL"
@@ -52,22 +59,24 @@ else
   echo "Image tarball already downloaded"
 fi
 
-section "Creating directories"
-run mkdir -p boot root
-
-section "Extracting image"
-run bsdtar -xpf "$IMAGE_TARBALL_NAME" -C root
-run sync
-
-size=$(du -sb root | awk '{print $1}')
-buffer_size=$((size * 110 / 100))  # 10% buffer
+section "Calculating image size"
+size=$(tar -tvf <(zcat $IMAGE_TARBALL_NAME) | awk '{total += $3} END {print total}')
+# check if one of the arguments starts with safe-buffer-space=
+# if so, use that value as the buffer size
+# otherwise, assign a default value of 50% buffer
+for arg in "$@"; do
+  if [[ $arg == safe-buffer-space=* ]]; then
+    safe_buffer_space=${arg#safe-buffer-space=}
+    echo "Using provided safe buffer space of $safe_buffer_space%"
+    break
+  fi
+done
+if [ -z "$safe_buffer_space" ]; then
+  safe_buffer_space=50
+  echo "Using default safe buffer space of 50%"
+fi
+buffer_size=$((size * (100 + safe_buffer_space) / 100))
 img_size_mb=$((buffer_size / 1024 / 1024))
-
-section "Copying boot files"
-run mv root/boot/* boot
-
-section "Fixing fstab"
-run sed -i 's/mmcblk0/mmcblk1/g' root/etc/fstab
 
 section "Creating .img file"
 if [ -f "$IMG_FILE" ]; then
@@ -84,6 +93,7 @@ check
 
 if [ -z "$LOOP_DEVICE" ]; then
     echo "Failed to set up loop device."
+    cleanup
     exit 1
 fi
 
@@ -114,14 +124,27 @@ section "Formatting partitions"
 run mkfs.vfat "${LOOP_DEVICE}p1"
 run mkfs.ext4 "${LOOP_DEVICE}p2"
 
-section "Checking if partitions can mount"
+section "Creating directories"
+run mkdir -p boot root
+
+section "Mounting partitions"
 run mount "${LOOP_DEVICE}p1" boot
 run mount "${LOOP_DEVICE}p2" root
 
+section "Extracting image"
+run bsdtar -xpf "$IMAGE_TARBALL_NAME" -C root
+run sync
+
+section "Moving boot files to boot partition"
+run mv root/boot/* boot
+
+section "Fixing fstab"
+run sed -i 's/mmcblk0/mmcblk1/g' root/etc/fstab
+
 section "Cleaning up"
 run umount boot root
-run rm -rf boot root
 run losetup -d "$LOOP_DEVICE"
+run rm -rf boot root
 cd - > /dev/null
 run mv $scriptloc/work/$IMG_FILE .
 
